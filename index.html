@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <!-- © Faktorisasi Adventure AR • @suhardyamir -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Faktorisasi Adventure AR Game</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Three.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- MediaPipe Hands & Camera Utils CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+</head>
+<body class="bg-slate-900 text-white font-sans overflow-hidden select-none">
+
+    <!-- OPENING SCENE / MODAL START -->
+    <div id="opening-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4">
+        <div class="bg-slate-900 border-4 border-cyan-500 rounded-3xl max-w-xl w-full p-8 text-center shadow-2xl flex flex-col gap-6">
+            <div class="inline-block mx-auto bg-cyan-500/20 p-4 rounded-full text-5xl">🎈🧮</div>
+            <div>
+                <h1 class="text-3xl font-extrabold text-cyan-400 mb-2">Faktorisasi Adventure AR</h1>
+                <p class="text-slate-300 text-sm">Petualangan belajar matematika aljabar dengan Augmented Reality dan kontrol gerakan tangan!</p>
+            </div>
+            
+            <div class="bg-slate-800 p-4 rounded-2xl text-left text-xs text-slate-300 space-y-2 border border-slate-700">
+                <p class="font-bold text-cyan-300 mb-1">Panduan Gesture Tangan:</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>✋ <b>Buka Tangan</b>: Mulai Game</div>
+                    <div>☝️ <b>Telunjuk</b>: Pilih Jawaban / Navigasi</div>
+                    <div>👌 <b>Pinch (Jepit)</b>: Klik / Ambil Objek</div>
+                    <div>✊ <b>Kepal Tangan</b>: Jeda (Pause)</div>
+                </div>
+            </div>
+
+            <button id="btn-start-game" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold py-4 px-8 rounded-2xl text-lg shadow-lg shadow-cyan-500/30 transition-all transform active:scale-95">
+                🚀 Mulai Berkelana
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN GAME CONTAINER -->
+    <div class="relative w-screen h-screen flex flex-col">
+        
+        <!-- HEADER PANEL -->
+        <header class="absolute top-0 left-0 right-0 z-20 flex justify-between items-center p-4 bg-slate-900/60 backdrop-blur-md border-b border-slate-800">
+            <div class="flex items-center gap-3">
+                <span class="text-2xl">🎈</span>
+                <div>
+                    <h2 class="text-sm font-bold text-cyan-400">Faktorisasi Adventure</h2>
+                    <p class="text-xs text-slate-400" id="progress-tracker">Soal 1/5</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-800/80 border border-cyan-500/40 px-4 py-2 rounded-xl flex items-center gap-2">
+                    <span class="text-xs text-slate-400">Skor:</span>
+                    <span id="score-display" class="font-extrabold text-cyan-400 text-lg">0</span>
+                </div>
+                <div id="gesture-indicator" class="bg-emerald-500/20 border border-emerald-500 text-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold">
+                    ✋ Siap
+                </div>
+            </div>
+        </header>
+
+        <!-- CANVAS & WEBCAM PREVIEW -->
+        <div id="canvas-container" class="relative w-full h-full flex-1">
+            <!-- Hidden video for MediaPipe -->
+            <video id="webcam-video" class="absolute opacity-0 pointer-events-none" autoplay playsinline></video>
+        </div>
+
+        <!-- QUESTION PANEL OVERLAY -->
+        <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 w-11/12 max-w-2xl bg-slate-900/80 backdrop-blur-md border border-cyan-500/40 rounded-3xl p-6 shadow-xl flex flex-col gap-3">
+            <div id="question-text" class="text-base md:text-lg font-bold text-center text-cyan-200">
+                Memuat soal aljabar...
+            </div>
+            <div class="text-xs text-center text-slate-400" id="instruction-subtext">
+                Pecahkan balon jawaban yang benar dengan mengarahkan jari telunjuk!
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FINAL RESULT MODAL -->
+    <div id="result-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-md p-4 hidden">
+        <div class="bg-slate-900 border-4 border-cyan-500 rounded-3xl max-w-md w-full p-8 text-center shadow-2xl flex flex-col gap-6">
+            <div class="text-5xl">🏆</div>
+            <div>
+                <h2 class="text-2xl font-extrabold text-cyan-400 mb-2">Petualangan Selesai!</h2>
+                <p class="text-slate-300 text-sm" id="result-motivational-msg">Luar biasa! Kamu hebat menyelesaikan misi faktorisasi.</p>
+            </div>
+            <div class="bg-slate-800 p-4 rounded-2xl flex justify-around text-center border border-slate-700">
+                <div>
+                    <div class="text-xs text-slate-400">Total Skor</div>
+                    <div id="final-score" class="text-2xl font-extrabold text-cyan-400">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-400">Benar</div>
+                    <div id="final-correct" class="text-2xl font-extrabold text-emerald-400">0</div>
+                </div>
+                <div>
+                    <div class="text-xs text-slate-400">Salah</div>
+                    <div id="final-wrong" class="text-2xl font-extrabold text-rose-400">0</div>
+                </div>
+            </div>
+            <button onclick="location.reload()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-extrabold py-3 px-6 rounded-2xl transition-all">
+                🔄 Main Lagi
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME LOGIC SCRIPT -->
+    <script>
+        // Data Soal Aljabar (5 MCQ)
+        const quizData = [
+            {
+                question: "Bentuk pemfaktoran dari x² + 5x + 6 adalah...",
+                options: ["(x+2)(x+3)", "(x+1)(x+6)", "(x-2)(x-3)", "(x+5)(x+1)"],
+                correct: 0,
+                explanation: "2 × 3 = 6 dan 2 + 3 = 5, sehingga faktornya (x+2)(x+3)."
+            },
+            {
+                question: "Faktorkan bentuk aljabar berikut: x² - 9 = ...",
+                options: ["(x-3)(x-3)", "(x+3)(x-3)", "(x+9)(x-1)", "(x+1)(x-9)"],
+                correct: 1,
+                explanation: "Ini adalah selisih dua kuadrat a² - b² = (a+b)(a-b)."
+            },
+            {
+                question: "Bentuk faktor dari 2x² + 4x adalah...",
+                options: ["2x(x+2)", "x(2x+4)", "2(x²+2x)", "2x(x-2)"],
+                correct: 0,
+                explanation: "Ambil FPB dari suku-sukunya yaitu 2x, sehingga 2x(x+2)."
+            },
+            {
+                question: "Pemfaktoran dari x² - 7x + 12 adalah...",
+                options: ["(x-3)(x-4)", "(x+3)(x+4)", "(x-2)(x-6)", "(x-1)(x-12)"],
+                correct: 0,
+                explanation: "Dua bilangan jika dikali 12 dan dijumlah -7 adalah -3 dan -4."
+            },
+            {
+                question: "Hasil pemfaktoran dari x² + 2x - 15 adalah...",
+                options: ["(x+5)(x-3)", "(x-5)(x+3)", "(x+5)(x+3)", "(x-5)(x-3)"],
+                correct: 0,
+                explanation: "5 × (-3) = -15 dan 5 + (-3) = 2."
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let correctCount = 0;
+        let wrongCount = 0;
+        let gameActive = false;
+
+        // Three.js & AR Variables
+        let scene, camera, renderer;
+        let balloonMeshes = [];
+        let cursorMesh;
+        let pointerPos = { x: 0, y: 0 };
+
+        // Web Audio Synthesizer
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playPopSound() {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // Initialize Three.js Environment
+        function initThree() {
+            const container = document.getElementById('canvas-container');
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            container.appendChild(renderer.domElement);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(0, 10, 5);
+            scene.add(directionalLight);
+
+            // Virtual Cursor for hand tracking
+            const cursorGeo = new THREE.SphereGeometry(0.12, 32, 32);
+            const cursorMat = new THREE.MeshBasicMaterial({ color: 0x00ffcc, wireframe: true });
+            cursorMesh = new THREE.Mesh(cursorGeo, cursorMat);
+            scene.add(cursorMesh);
+
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Create Balloons with Text Texture
+        function loadQuestionBalloons() {
+            // Clear old balloons
+            balloonMeshes.forEach(b => scene.remove(b));
+            balloonMeshes = [];
+
+            if (currentQuestionIndex >= quizData.length) {
+                endGame();
+                return;
+            }
+
+            const q = quizData[currentQuestionIndex];
+            document.getElementById('question-text').textContent = q.question;
+            document.getElementById('progress-tracker').textContent = `Soal ${currentQuestionIndex + 1}/5`;
+
+            const positions = [
+                { x: -2.2, y: 1.2, z: 0 },
+                { x: 2.2, y: 1.2, z: 0 },
+                { x: -2.2, y: -0.8, z: 0 },
+                { x: 2.2, y: -0.8, z: 0 }
+            ];
+
+            q.options.forEach((opt, idx) => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#0f172a';
+                ctx.roundRect(10, 10, 236, 108, 20);
+                ctx.fill();
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = idx === q.correct ? '#10b981' : '#06b6d4';
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 24px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(opt, 128, 64);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const geometry = new THREE.SphereGeometry(0.9, 32, 32);
+                const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3 });
+                const balloon = new THREE.Mesh(geometry, material);
+
+                balloon.position.set(positions[idx].x, positions[idx].y, positions[idx].z);
+                balloon.userData = { optionIndex: idx, correct: idx === q.correct };
+
+                scene.add(balloon);
+                balloonMeshes.push(balloon);
+            });
+        }
+
+        // MediaPipe Hands Integration
+        function initMediaPipe() {
+            const videoElement = document.getElementById('webcam-video');
+            const hands = new Hands({
+                locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
+            });
+
+            hands.setOptions({
+                maxNumHands: 1,
+                modelComplexity: 1,
+                minDetectionConfidence: 0.6,
+                minTrackingConfidence: 0.6
+            });
+
+            hands.onResults(onHandResults);
+
+            const cameraUtils = new Camera(videoElement, {
+                onFrame: async () => {
+                    await hands.send({ image: videoElement });
+                },
+                width: 640,
+                height: 480
+            });
+            cameraUtils.start();
+        }
+
+        function onHandResults(results) {
+            const indicator = document.getElementById('gesture-indicator');
+            if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+                indicator.textContent = "✋ Tangan Tidak Terdeteksi";
+                indicator.className = "bg-rose-500/20 border border-rose-500 text-rose-300 px-3 py-1.5 rounded-xl text-xs font-bold";
+                return;
+            }
+
+            const landmarks = results.multiHandLandmarks[0];
+            // Index finger tip is landmark 8
+            const indexTip = landmarks[8];
+            const thumbTip = landmarks[4];
+            const wrist = landmarks[0];
+
+            // Map normalized coordinates to Three.js screen space (-3 to 3)
+            pointerPos.x = (indexTip.x - 0.5) * -5.5;
+            pointerPos.y = -(indexTip.y - 0.5) * 3.5;
+
+            if (cursorMesh) {
+                cursorMesh.position.set(pointerPos.x, pointerPos.y, 0);
+            }
+
+            // Gesture Analysis
+            // Open Hand check (all fingers extended) vs Fist vs Pinch
+            const isPinch = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y) < 0.05;
+            const isFist = indexTip.y > landmarks[6].y && landmarks[12].y > landmarks[10].y;
+
+            if (!gameActive) {
+                // Open Hand or Pinch to start
+                if (isPinch || landmarks[8].y < landmarks[5].y) {
+                    startGame();
+                }
+                return;
+            }
+
+            if (isFist) {
+                indicator.textContent = "✊ Fist (Pause)";
+                indicator.className = "bg-amber-500/20 border border-amber-500 text-amber-300 px-3 py-1.5 rounded-xl text-xs font-bold";
+                return;
+            }
+
+            if (isPinch) {
+                indicator.textContent = "👌 Pinch (Klik)";
+                indicator.className = "bg-cyan-500/20 border border-cyan-500 text-cyan-300 px-3 py-1.5 rounded-xl text-xs font-bold";
+                checkCollision();
+            } else {
+                indicator.textContent = "☝️ Pointing Active";
+                indicator.className = "bg-emerald-500/20 border border-emerald-500 text-emerald-300 px-3 py-1.5 rounded-xl text-xs font-bold";
+            }
+        }
+
+        function checkCollision() {
+            if (!gameActive) return;
+
+            balloonMeshes.forEach((balloon, idx) => {
+                const distance = balloon.position.distanceTo(cursorMesh.position);
+                if (distance < 1.1) {
+                    playPopSound();
+                    const isCorrect = balloon.userData.correct;
+
+                    if (isCorrect) {
+                        score += 10;
+                        correctCount++;
+                    } else {
+                        wrongCount++;
+                    }
+
+                    document.getElementById('score-display').textContent = score;
+                    currentQuestionIndex++;
+                    loadQuestionBalloons();
+                }
+            });
+        }
+
+        function startGame() {
+            if (gameActive) return;
+            gameActive = true;
+            document.getElementById('opening-screen').classList.add('hidden');
+            loadQuestionBalloons();
+        }
+
+        function endGame() {
+            gameActive = false;
+            document.getElementById('final-score').textContent = score;
+            document.getElementById('final-correct').textContent = correctCount;
+            document.getElementById('final-wrong').textContent = wrongCount;
+            document.getElementById('result-screen').classList.remove('hidden');
+        }
+
+        // Animation Loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Float balloons gently
+            balloonMeshes.forEach((b, i) => {
+                b.rotation.y += 0.01;
+                b.position.y += Math.sin(Date.now() * 0.003 + i) * 0.003;
+            });
+
+            renderer.render(scene, camera);
+        }
+
+        // Initialize on Load
+        window.addEventListener('DOMContentLoaded', () => {
+            initThree();
+            initMediaPipe();
+            animate();
+
+            document.getElementById('btn-start-game').addEventListener('click', startGame);
+        });
+    </script>
+</body>
+      </html>
+  
